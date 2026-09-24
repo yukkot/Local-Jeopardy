@@ -1,6 +1,9 @@
 {
   "name": "jeopardy-app",
   "version": "0.1.0",
+  "engines": {
+  "node": ">=22"
+  },
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,6 +19,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.14.0",
     "@types/react": "^18.3.0",
     "autoprefixer": "^10.4.19",
