@@ -37,11 +37,17 @@ Tablero estilo Jeopardy para jugar en grupo, con panel de administración para c
 
 ## Correr con Docker
 
+Requiere tener el `.env.local` creado (paso 2 de arriba).
+
 ```
-docker compose up --build
+docker compose --env-file .env.local up --build
 ```
 
 Esto dockeriza el proyecto completo (frontend + API Routes) y lo expone en `localhost:3000`.
+
+> El `--env-file .env.local` es obligatorio al construir: las variables `NEXT_PUBLIC_*` se incrustan en la imagen durante el build. El `.env.local` no se copia a la imagen, para no dejar las claves adentro.
+>
+> Si ya tienes `npm run dev` corriendo, deténlo antes: ambos usan el puerto 3000.
 
 ## Tests y coverage
 
