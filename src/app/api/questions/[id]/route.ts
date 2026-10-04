@@ -28,6 +28,7 @@ export async function PATCH(
     prompt: body.prompt,
     correct_answer: body.correct_answer,
     media_url: body.media_url,
+    answer_media_url: body.answer_media_url,
   });
 
   if (error) {

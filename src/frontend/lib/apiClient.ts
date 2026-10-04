@@ -66,6 +66,7 @@ export interface CreateQuestionPayload {
   prompt: string;
   correct_answer: string;
   media_url?: string | null; // imagen, audio o video (uno solo)
+  answer_media_url?: string | null;
 }
 
 export async function createQuestion(

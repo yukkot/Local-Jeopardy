@@ -5,6 +5,7 @@ interface QuestionFields {
   prompt: string;
   correct_answer: string;
   media_url?: string | null; // imagen, audio o video (uno solo)
+  answer_media_url?: string | null;
 }
 
 interface CreateQuestionInput extends QuestionFields {
@@ -20,6 +21,7 @@ export async function createQuestion(input: CreateQuestionInput) {
       prompt: input.prompt,
       correct_answer: input.correct_answer,
       media_url: input.media_url ?? null,
+      answer_media_url: input.answer_media_url ?? null,
     })
     .select()
     .single();

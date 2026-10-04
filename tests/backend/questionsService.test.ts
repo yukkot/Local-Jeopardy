@@ -13,7 +13,7 @@ describe("questionsService", () => {
   afterEach(() => jest.clearAllMocks());
 
   describe("createQuestion", () => {
-    it("crea la pregunta con su archivo multimedia", async () => {
+    it("crea la pregunta con su archivo de pregunta y de respuesta", async () => {
       const single = jest.fn().mockResolvedValueOnce({
         data: { id: "q-1", value: 200, prompt: "p", correct_answer: "Chile", media_url: "http://a.png" },
         error: null,
@@ -28,6 +28,7 @@ describe("questionsService", () => {
         prompt: "p",
         correct_answer: "Chile",
         media_url: "http://a.png",
+        answer_media_url: "http://respuesta.png",
       });
 
       expect(insert).toHaveBeenCalledWith({
@@ -36,12 +37,13 @@ describe("questionsService", () => {
         prompt: "p",
         correct_answer: "Chile",
         media_url: "http://a.png",
+        answer_media_url: "http://respuesta.png",
       });
       expect(result.error).toBeNull();
       expect(result.data?.id).toBe("q-1");
     });
 
-    it("guarda media_url como null si no se envia archivo", async () => {
+    it("guarda ambos archivos como null si no se envian", async () => {
       const single = jest.fn().mockResolvedValueOnce({
         data: { id: "q-2" },
         error: null,
@@ -58,7 +60,7 @@ describe("questionsService", () => {
       });
 
       expect(insert).toHaveBeenCalledWith(
-        expect.objectContaining({ media_url: null })
+        expect.objectContaining({ media_url: null, answer_media_url: null })
       );
     });
 

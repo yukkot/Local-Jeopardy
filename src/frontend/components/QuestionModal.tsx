@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Player } from "./PlayerBar";
 
 interface QuestionModalProps {
@@ -9,6 +9,7 @@ interface QuestionModalProps {
     prompt: string;
     correct_answer: string | null;
     media_url: string | null;
+    answer_media_url: string | null;
   };
   isRevealed: boolean;
   setIsRevealed: (val: boolean) => void;
@@ -28,6 +29,55 @@ function getMediaKind(url: string): MediaKind {
   return "image";
 }
 
+function MediaView({ url }: { url: string }) {
+  const kind = getMediaKind(url);
+  const [imgLoading, setImgLoading] = useState(kind === "image");
+
+  if (kind === "audio") {
+    return (
+      <div className="mb-4 shrink-0">
+        <audio controls src={url} className="w-full" />
+      </div>
+    );
+  }
+
+  if (kind === "video") {
+    return (
+      <div className="mb-4 flex justify-center shrink-0">
+        <video
+          controls
+          src={url}
+          className="w-full max-w-xl max-h-[420px] rounded-lg bg-panel-deep"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 flex justify-center shrink-0">
+      <div className="relative bg-panel-deep border border-ink-muted/15 rounded-lg p-3 w-full max-w-xl h-80 sm:h-[420px] flex items-center justify-center overflow-hidden">
+        {imgLoading && (
+          <span className="absolute font-mono text-xs text-ink-muted animate-pulse">
+            cargando imagen...
+          </span>
+        )}
+        <img
+          src={url}
+          alt="Archivo de la pregunta"
+          ref={(node) => {
+            if (node?.complete) setImgLoading(false);
+          }}
+          onLoad={() => setImgLoading(false)}
+          onError={() => setImgLoading(false)}
+          className={`w-full h-full object-contain transition-opacity duration-200 ${
+            imgLoading ? "opacity-0" : "opacity-100"
+          }`}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function QuestionModal({
   question,
   isRevealed,
@@ -38,13 +88,10 @@ export function QuestionModal({
   submitScores,
   close,
 }: QuestionModalProps) {
-  const mediaUrl = question.media_url;
-  const kind = mediaUrl ? getMediaKind(mediaUrl) : null;
-  const [imgLoading, setImgLoading] = useState(kind === "image");
-
-  useEffect(() => {
-    if (kind === "image") setImgLoading(true);
-  }, [mediaUrl, kind]);
+  const displayUrl =
+    isRevealed && question.answer_media_url
+      ? question.answer_media_url
+      : question.media_url;
 
   return (
     <div className="fixed inset-0 bg-void/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -65,48 +112,7 @@ export function QuestionModal({
           {question.prompt}
         </h2>
 
-        {mediaUrl && kind === "image" && (
-          <div className="mb-4 flex justify-center shrink-0">
-            <div className="relative bg-panel-deep border border-ink-muted/15 rounded-lg p-3 w-full max-w-xl h-80 sm:h-[420px] flex items-center justify-center overflow-hidden">
-              {imgLoading && (
-                <span className="absolute font-mono text-xs text-ink-muted animate-pulse">
-                  cargando imagen...
-                </span>
-              )}
-              <img
-                key={mediaUrl}
-                src={mediaUrl}
-                alt="Pista"
-                ref={(node) => {
-                  // Si el navegador ya tenia la imagen en cache, el evento
-                  // onLoad pudo haber disparado antes de escucharlo.
-                  if (node?.complete) setImgLoading(false);
-                }}
-                onLoad={() => setImgLoading(false)}
-                onError={() => setImgLoading(false)}
-                className={`w-full h-full object-contain transition-opacity duration-200 ${
-                  imgLoading ? "opacity-0" : "opacity-100"
-                }`}
-              />
-            </div>
-          </div>
-        )}
-
-        {mediaUrl && kind === "audio" && (
-          <div className="mb-4 shrink-0">
-            <audio controls src={mediaUrl} className="w-full" />
-          </div>
-        )}
-
-        {mediaUrl && kind === "video" && (
-          <div className="mb-4 flex justify-center shrink-0">
-            <video
-              controls
-              src={mediaUrl}
-              className="w-full max-w-xl max-h-[420px] rounded-lg bg-panel-deep"
-            />
-          </div>
-        )}
+        {displayUrl && <MediaView key={displayUrl} url={displayUrl} />}
 
         {isRevealed && question.correct_answer && (
           <div className="bg-panel-deep border border-marigold/30 rounded-lg p-3.5 mb-6 mt-2 text-center shrink-0">

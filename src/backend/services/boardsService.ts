@@ -34,7 +34,8 @@ export async function getBoardWithDetails(id: string) {
           value,
           prompt,
           correct_answer,
-          media_url
+          media_url,
+          answer_media_url
         )
       )
     `

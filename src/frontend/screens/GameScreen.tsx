@@ -13,6 +13,7 @@ interface Question {
   prompt: string;
   correct_answer: string | null;
   media_url: string | null;
+  answer_media_url: string | null;
 }
 
 interface Category {

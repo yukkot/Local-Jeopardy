@@ -17,6 +17,7 @@ interface QuestionSummary {
   prompt: string;
   correct_answer: string | null;
   media_url: string | null;
+  answer_media_url: string | null;
 }
 
 interface CategoryDetail {
@@ -29,6 +30,41 @@ interface BoardWithCategory {
   id: string;
   name: string;
   categories: CategoryDetail[];
+}
+
+function MediaField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  return (
+    <div>
+      <FileUploadField
+        label={label}
+        accept="image/*,audio/*,video/*"
+        value={value}
+        onChange={onChange}
+      />
+      {value && (
+        <div className="flex items-center justify-between gap-3 mt-2 bg-panel-deep border border-ink-muted/15 rounded-md px-3 py-2">
+          <span className="font-mono text-[10px] text-ink-muted truncate">
+            {value.split("/").pop()}
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="font-mono text-xs text-ink-muted hover:text-rose transition shrink-0"
+          >
+            quitar
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AdminCategoryScreen({
@@ -50,6 +86,7 @@ export function AdminCategoryScreen({
   const [prompt, setPrompt] = useState("");
   const [correctAnswer, setCorrectAnswer] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
+  const [answerMediaUrl, setAnswerMediaUrl] = useState("");
 
   async function loadBoard() {
     try {
@@ -74,6 +111,7 @@ export function AdminCategoryScreen({
     setPrompt("");
     setCorrectAnswer("");
     setMediaUrl("");
+    setAnswerMediaUrl("");
   }
 
   function startEdit(q: QuestionSummary) {
@@ -83,6 +121,7 @@ export function AdminCategoryScreen({
     setPrompt(q.prompt);
     setCorrectAnswer(q.correct_answer || "");
     setMediaUrl(q.media_url || "");
+    setAnswerMediaUrl(q.answer_media_url || "");
   }
 
   async function handleDelete(questionId: string) {
@@ -131,6 +170,7 @@ export function AdminCategoryScreen({
       prompt: prompt.trim(),
       correct_answer: correctAnswer.trim(),
       media_url: mediaUrl || null,
+      answer_media_url: answerMediaUrl || null,
     };
 
     try {
@@ -236,7 +276,7 @@ export function AdminCategoryScreen({
                     ${q.value}
                   </span>
                   <div className="flex items-center gap-3">
-                    {q.media_url && (
+                    {(q.media_url || q.answer_media_url) && (
                       <span className="font-mono text-[10px] text-ink-muted">
                         con archivo
                       </span>
@@ -314,28 +354,17 @@ export function AdminCategoryScreen({
             />
           </div>
 
-          <div>
-            <FileUploadField
-              label="Archivo multimedia (opcional: imagen, audio o video; solo uno)"
-              accept="image/*,audio/*,video/*"
-              value={mediaUrl}
-              onChange={setMediaUrl}
-            />
-            {mediaUrl && (
-              <div className="flex items-center justify-between gap-3 mt-2 bg-panel-deep border border-ink-muted/15 rounded-md px-3 py-2">
-                <span className="font-mono text-[10px] text-ink-muted truncate">
-                  {mediaUrl.split("/").pop()}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setMediaUrl("")}
-                  className="font-mono text-xs text-ink-muted hover:text-rose transition shrink-0"
-                >
-                  quitar
-                </button>
-              </div>
-            )}
-          </div>
+          <MediaField
+            label="Archivo de la pregunta (opcional: imagen, audio o video)"
+            value={mediaUrl}
+            onChange={setMediaUrl}
+          />
+
+          <MediaField
+            label="Archivo de la respuesta (opcional; se muestra al revelar)"
+            value={answerMediaUrl}
+            onChange={setAnswerMediaUrl}
+          />
 
           {formError && <p className="font-mono text-sm text-rose">{formError}</p>}
 
