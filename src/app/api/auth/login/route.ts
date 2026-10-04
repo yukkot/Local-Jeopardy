@@ -1,22 +1,26 @@
 import { NextResponse } from "next/server";
+import {
+  validateAdminPassword,
+  sessionCookieOptions,
+  SESSION_COOKIE_NAME,
+} from "@/backend/services/authService";
 
 export async function POST(request: Request) {
   const { password } = await request.json();
 
-  if (password !== process.env.ADMIN_PASSWORD) {
+  if (!validateAdminPassword(password)) {
     return NextResponse.json(
-      { error: "Contrasena incorrecta" },
+      { error: "Contraseña incorrecta" },
       { status: 401 }
     );
   }
 
   const response = NextResponse.json({ success: true });
-  response.cookies.set("admin_session", process.env.ADMIN_PASSWORD ?? "", {
-    httpOnly: true,
-    sameSite: "lax",
-    maxAge: 60 * 60 * 8, // 8 horas
-    path: "/",
-  });
+  response.cookies.set(
+    SESSION_COOKIE_NAME,
+    process.env.ADMIN_PASSWORD ?? "",
+    sessionCookieOptions()
+  );
 
   return response;
 }

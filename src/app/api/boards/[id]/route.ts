@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabaseClient";
+import { getBoardWithDetails } from "@/backend/services/boardsService";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { data, error } = await supabase
-    .from("boards")
-    .select("*")
-    .eq("id", params.id)
-    .single();
+  const { id } = await params;
+  const { data, error } = await getBoardWithDetails(id);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 404 });
+  if (error || !data) {
+    return NextResponse.json(
+      { error: error || "Tablero no encontrado" },
+      { status: 404 }
+    );
   }
 
   return NextResponse.json(data);

@@ -8,7 +8,10 @@ const customJestConfig = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
-  collectCoverageFrom: ["src/lib/**/*.ts"],
+  // El enunciado pide coverage minimo del 60% del backend especificamente.
+  // Con la separacion en src/backend, esto ahora es literal: solo se mide
+  // ese folder (la UI en src/frontend queda fuera del calculo a proposito).
+  collectCoverageFrom: ["src/backend/**/*.ts"],
   coverageThreshold: {
     global: {
       statements: 60,

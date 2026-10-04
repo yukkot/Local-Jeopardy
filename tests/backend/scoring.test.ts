@@ -1,4 +1,4 @@
-import { applyScore } from "@/lib/scoring";
+import { applyScore } from "@/backend/logic/scoring";
 
 describe("applyScore", () => {
   it("suma el valor cuando la respuesta es correcta", () => {

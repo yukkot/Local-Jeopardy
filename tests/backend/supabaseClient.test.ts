@@ -14,7 +14,7 @@ describe("supabaseClient", () => {
   });
 
   it("debe instanciar el cliente de Supabase correctamente", () => {
-    const { supabase } = require("@/lib/supabaseClient");
+    const { supabase } = require("@/backend/lib/supabaseClient");
     expect(supabase).toBeDefined();
     expect(typeof supabase.from).toBe("function");
   });
