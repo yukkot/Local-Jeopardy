@@ -1,7 +1,11 @@
+export type ScoreOutcome = "add" | "subtract" | "none";
+
 export function applyScore(
   currentScore: number,
   value: number,
-  correct: boolean
+  outcome: ScoreOutcome
 ): number {
-  return correct ? currentScore + value : currentScore - value;
+  if (outcome === "add") return currentScore + value;
+  if (outcome === "subtract") return currentScore - value;
+  return currentScore;
 }

@@ -1,10 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { PlayerBar, Player } from "@/frontend/components/PlayerBar";
+import {
+  PlayerBar,
+  Player,
+  pickPlayerColor,
+} from "@/frontend/components/PlayerBar";
 import { QuestionModal } from "@/frontend/components/QuestionModal";
-import { applyScore } from "@/backend/logic/scoring";
+import { RouletteModal } from "@/frontend/components/RouletteModal";
+import { applyScore, ScoreOutcome } from "@/backend/logic/scoring";
+import { shuffle, isMinigameValue } from "@/backend/logic/random";
+import { nextTurnHolder, holderAfterRemoval } from "@/backend/logic/turns";
+import {
+  INITIAL_STAR_STATE,
+  StarState,
+  starAfterOutcome,
+  starAfterToggle,
+} from "@/backend/logic/star";
 import { getBoardById } from "@/frontend/lib/apiClient";
 
 interface Question {
@@ -29,6 +42,9 @@ interface BoardData {
   categories: Category[];
 }
 
+const DRAW_TICKS = 14;
+const DRAW_INTERVAL_MS = 100;
+
 export function GameScreen({ boardId }: { boardId: string }) {
   const [board, setBoard] = useState<BoardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +56,25 @@ export function GameScreen({ boardId }: { boardId: string }) {
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [newPlayerName, setNewPlayerName] = useState("");
-  const [selectedWinners, setSelectedWinners] = useState<string[]>([]);
+  const [outcomes, setOutcomes] = useState<Record<string, ScoreOutcome>>({});
+  const [roulettePending, setRoulettePending] = useState<Question | null>(null);
+  const [participantCount, setParticipantCount] = useState<number | null>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [turnPlayerId, setTurnPlayerId] = useState<string | null>(null);
+  const [star, setStar] = useState<StarState>(INITIAL_STAR_STATE);
+  const drawTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playersRef = useRef<Player[]>([]);
+
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
+
+  useEffect(() => {
+    return () => {
+      if (drawTimer.current) clearInterval(drawTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchBoard() {
@@ -58,26 +92,62 @@ export function GameScreen({ boardId }: { boardId: string }) {
     fetchBoard();
   }, [boardId]);
 
+  const drawOrder = () => {
+    if (players.length < 2 || drawing || gameStarted) return;
+    setDrawing(true);
+    let ticks = 0;
+    drawTimer.current = setInterval(() => {
+      const next = shuffle(playersRef.current);
+      playersRef.current = next;
+      setPlayers(next);
+      ticks += 1;
+      if (ticks >= DRAW_TICKS) {
+        if (drawTimer.current) clearInterval(drawTimer.current);
+        drawTimer.current = null;
+        setTurnPlayerId(next[0]?.id ?? null);
+        setDrawing(false);
+      }
+    }, DRAW_INTERVAL_MS);
+  };
+
   const addPlayer = () => {
     if (!newPlayerName.trim()) return;
     setPlayers((prev) => [
       ...prev,
-      { id: Date.now().toString(), name: newPlayerName.trim(), score: 0 },
+      {
+        id: Date.now().toString(),
+        name: newPlayerName.trim(),
+        score: 0,
+        color: pickPlayerColor(prev),
+      },
     ]);
     setNewPlayerName("");
   };
 
   const removePlayer = (id: string) => {
+    if (gameStarted) return;
+    setTurnPlayerId(
+      holderAfterRemoval(
+        players.map((p) => p.id),
+        id,
+        turnPlayerId,
+      ),
+    );
     setPlayers((prev) => prev.filter((p) => p.id !== id));
-    setSelectedWinners((prev) => prev.filter((wId) => wId !== id));
+    setOutcomes((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
-  const toggleWinner = (playerId: string) => {
-    setSelectedWinners((prev) =>
-      prev.includes(playerId)
-        ? prev.filter((id) => id !== playerId)
-        : [...prev, playerId]
-    );
+  const toggleStar = (playerId: string) => {
+    setStar((prev) => starAfterToggle(prev, playerId));
+  };
+
+  const setOutcome = (playerId: string, outcome: ScoreOutcome) => {
+    setOutcomes((prev) => ({ ...prev, [playerId]: outcome }));
+    setStar((prev) => starAfterOutcome(prev, playerId, outcome));
   };
 
   const submitScores = () => {
@@ -85,22 +155,44 @@ export function GameScreen({ boardId }: { boardId: string }) {
 
     setPlayers((prev) =>
       prev.map((player) => {
-        const isWinner = selectedWinners.includes(player.id);
-        const nextScore = applyScore(player.score, activeQuestion.value, isWinner);
+        const nextScore = applyScore(
+          player.score,
+          activeQuestion.value,
+          outcomes[player.id] ?? "none",
+        );
         return { ...player, score: nextScore };
-      })
+      }),
     );
 
+    setTurnPlayerId(
+      nextTurnHolder(
+        players.map((p) => p.id),
+        turnPlayerId,
+        star.playerId,
+      ),
+    );
     setUsedQuestions((prev) => [...prev, activeQuestion.id]);
     setActiveQuestion(null);
     setIsRevealed(false);
+    setParticipantCount(null);
+  };
+
+  const startQuestion = (q: Question, participants: number | null) => {
+    setActiveQuestion(q);
+    setIsRevealed(false);
+    setOutcomes({});
+    setStar(INITIAL_STAR_STATE);
+    setParticipantCount(participants);
   };
 
   const openQuestion = (q: Question) => {
     if (usedQuestions.includes(q.id)) return;
-    setActiveQuestion(q);
-    setIsRevealed(false);
-    setSelectedWinners([]);
+    setGameStarted(true);
+    if (isMinigameValue(q.value) && players.length >= 2) {
+      setRoulettePending(q);
+      return;
+    }
+    startQuestion(q, null);
   };
 
   if (loading) {
@@ -117,7 +209,10 @@ export function GameScreen({ boardId }: { boardId: string }) {
         <p className="font-mono text-sm text-ink-muted">
           {error || "Tablero no encontrado"}
         </p>
-        <Link href="/" className="font-mono text-xs text-marigold hover:underline">
+        <Link
+          href="/"
+          className="font-mono text-xs text-marigold hover:underline"
+        >
           ← volver al inicio
         </Link>
       </div>
@@ -144,11 +239,17 @@ export function GameScreen({ boardId }: { boardId: string }) {
         setNewPlayerName={setNewPlayerName}
         addPlayer={addPlayer}
         removePlayer={removePlayer}
+        onDrawOrder={drawOrder}
+        drawing={drawing}
+        gameStarted={gameStarted}
+        turnPlayerId={turnPlayerId}
       />
 
       <section
         className="grid gap-3 max-w-5xl mx-auto"
-        style={{ gridTemplateColumns: `repeat(${board.categories.length || 1}, minmax(0, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(${board.categories.length || 1}, minmax(0, 1fr))`,
+        }}
       >
         {board.categories.map((cat) => (
           <div key={cat.id} className="flex flex-col">
@@ -182,18 +283,35 @@ export function GameScreen({ boardId }: { boardId: string }) {
         ))}
       </section>
 
+      {roulettePending && (
+        <RouletteModal
+          maxPlayers={players.length}
+          questionValue={roulettePending.value}
+          onCancel={() => setRoulettePending(null)}
+          onContinue={(participants) => {
+            const question = roulettePending;
+            setRoulettePending(null);
+            startQuestion(question, participants);
+          }}
+        />
+      )}
+
       {activeQuestion && (
         <QuestionModal
           question={activeQuestion}
           isRevealed={isRevealed}
           setIsRevealed={setIsRevealed}
+          participantCount={participantCount}
           players={players}
-          selectedWinners={selectedWinners}
-          toggleWinner={toggleWinner}
+          outcomes={outcomes}
+          setOutcome={setOutcome}
+          starPlayerId={star.playerId}
+          onToggleStar={toggleStar}
           submitScores={submitScores}
           close={() => {
             setActiveQuestion(null);
             setIsRevealed(false);
+            setParticipantCount(null);
           }}
         />
       )}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Player } from "./PlayerBar";
+import type { ScoreOutcome } from "@/backend/logic/scoring";
 
 interface QuestionModalProps {
   question: {
@@ -13,9 +14,12 @@ interface QuestionModalProps {
   };
   isRevealed: boolean;
   setIsRevealed: (val: boolean) => void;
+  participantCount?: number | null;
   players: Player[];
-  selectedWinners: string[];
-  toggleWinner: (id: string) => void;
+  outcomes: Record<string, ScoreOutcome>;
+  setOutcome: (playerId: string, outcome: ScoreOutcome) => void;
+  starPlayerId: string | null;
+  onToggleStar: (playerId: string) => void;
   submitScores: () => void;
   close: () => void;
 }
@@ -78,13 +82,48 @@ function MediaView({ url }: { url: string }) {
   );
 }
 
+const OUTCOME_STYLES: Record<ScoreOutcome, string> = {
+  add: "bg-teal/15 border-teal text-teal",
+  subtract: "bg-rose/15 border-rose text-rose",
+  none: "bg-ink-muted/15 border-ink-muted text-ink",
+};
+
+function OutcomeButton({
+  tone,
+  active,
+  onClick,
+  label,
+}: {
+  tone: ScoreOutcome;
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2.5 py-1.5 rounded border font-mono text-xs font-semibold transition ${
+        active
+          ? OUTCOME_STYLES[tone]
+          : "border-ink-muted/15 text-ink-muted hover:border-ink-muted/40"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export function QuestionModal({
   question,
   isRevealed,
   setIsRevealed,
+  participantCount,
   players,
-  selectedWinners,
-  toggleWinner,
+  outcomes,
+  setOutcome,
+  starPlayerId,
+  onToggleStar,
   submitScores,
   close,
 }: QuestionModalProps) {
@@ -97,9 +136,17 @@ export function QuestionModal({
     <div className="fixed inset-0 bg-void/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-panel border border-ink-muted/20 rounded-xl max-w-2xl w-full p-6 text-ink shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-ink-muted/15 shrink-0">
-          <span className="font-mono font-bold text-lg text-marigold">
-            ${question.value}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="font-mono font-bold text-lg text-marigold">
+              ${question.value}
+            </span>
+            {participantCount != null && (
+              <span className="font-mono text-xs px-2 py-0.5 rounded border border-marigold/40 text-marigold">
+                Minijuego: {participantCount}{" "}
+                {participantCount === 1 ? "jugador" : "jugadores"}
+              </span>
+            )}
+          </div>
           <button
             onClick={close}
             className="font-mono text-xs text-ink-muted hover:text-ink px-2.5 py-1 rounded border border-ink-muted/20 hover:border-ink-muted/40 transition"
@@ -136,32 +183,68 @@ export function QuestionModal({
           ) : (
             <div className="space-y-4">
               <div>
-                <label className="font-mono text-xs text-ink-muted block mb-2">
-                  ¿Quién acertó? (+${question.value})
+                <label className="font-mono text-xs text-ink-muted block mb-1">
+                  Puntaje de esta pregunta
                 </label>
                 {players.length === 0 ? (
                   <p className="font-mono text-xs text-ink-muted/70 italic py-2">
-                    No hay participantes registrados. Puedes confirmar igual
-                    para marcar la casilla como usada.
+                    No hay participantes registrados.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-36 overflow-y-auto pr-1">
+                  <div className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-1">
                     {players.map((p) => {
-                      const isChecked = selectedWinners.includes(p.id);
+                      const current = outcomes[p.id] ?? "none";
                       return (
-                        <button
+                        <div
                           key={p.id}
-                          type="button"
-                          onClick={() => toggleWinner(p.id)}
-                          className={`flex items-center justify-between px-3 py-2 rounded-md border font-mono text-xs font-semibold transition ${
-                            isChecked
-                              ? "bg-marigold/15 border-marigold text-marigold"
-                              : "bg-panel-deep border-ink-muted/15 text-ink-muted hover:border-ink-muted/30"
-                          }`}
+                          className="flex items-center justify-between gap-3 bg-panel-deep border border-ink-muted/15 rounded-md px-3 py-2"
+                          style={{
+                            borderLeftColor: p.color,
+                            borderLeftWidth: 4,
+                          }}
                         >
-                          <span className="truncate">{p.name}</span>
-                          <span>{isChecked ? "✓" : "○"}</span>
-                        </button>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => onToggleStar(p.id)}
+                              aria-pressed={starPlayerId === p.id}
+                              title="Respondió correctamente"
+                              className={`text-lg leading-none transition ${
+                                starPlayerId === p.id
+                                  ? "text-marigold"
+                                  : "text-ink-muted/40 hover:text-marigold/70"
+                              }`}
+                            >
+                              {starPlayerId === p.id ? "★" : "☆"}
+                            </button>
+                            <span
+                              className="font-display text-sm font-semibold truncate"
+                              style={{ color: p.color }}
+                            >
+                              {p.name}
+                            </span>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            <OutcomeButton
+                              tone="subtract"
+                              active={current === "subtract"}
+                              onClick={() => setOutcome(p.id, "subtract")}
+                              label={`-$${question.value}`}
+                            />
+                            <OutcomeButton
+                              tone="none"
+                              active={current === "none"}
+                              onClick={() => setOutcome(p.id, "none")}
+                              label="Sin cambio"
+                            />
+                            <OutcomeButton
+                              tone="add"
+                              active={current === "add"}
+                              onClick={() => setOutcome(p.id, "add")}
+                              label={`+$${question.value}`}
+                            />
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
